@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import apiClient from '../api/axios';
+import { loginUser, registerUser, loginWithGoogle, logoutUser } from '../api/authApi';
+import { getUserProfile, updateUserProfile } from '../api/adminApi';
 
 const AuthContext = createContext(null);
 
@@ -15,8 +16,8 @@ export const AuthProvider = ({ children }) => {
       if (storedUser && token) {
         try {
           setUser(JSON.parse(storedUser));
-          const res = await apiClient.get('/users/profile');
-          const freshUser = res.data.data.user;
+          const res = await getUserProfile();
+          const freshUser = res.data.user;
           setUser(freshUser);
           localStorage.setItem('user', JSON.stringify(freshUser));
         } catch (error) {
@@ -48,8 +49,8 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const res = await apiClient.post('/auth/login', { email, password });
-      const { user: loggedUser, accessToken } = res.data.data;
+      const res = await loginUser(email, password);
+      const { user: loggedUser, accessToken } = res.data;
       
       localStorage.setItem('access_token', accessToken);
       localStorage.setItem('user', JSON.stringify(loggedUser));
@@ -63,8 +64,8 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = async (idToken) => {
     setLoading(true);
     try {
-      const res = await apiClient.post('/auth/google', { idToken });
-      const { user: loggedUser, accessToken } = res.data.data;
+      const res = await loginWithGoogle(idToken);
+      const { user: loggedUser, accessToken } = res.data;
 
       localStorage.setItem('access_token', accessToken);
       localStorage.setItem('user', JSON.stringify(loggedUser));
@@ -78,8 +79,8 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     setLoading(true);
     try {
-      const res = await apiClient.post('/auth/register', { name, email, password });
-      const { user: registeredUser, accessToken } = res.data.data;
+      const res = await registerUser(name, email, password);
+      const { user: registeredUser, accessToken } = res.data;
       
       localStorage.setItem('access_token', accessToken);
       localStorage.setItem('user', JSON.stringify(registeredUser));
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     try {
-      await apiClient.post('/auth/logout');
+      await logoutUser();
     } catch (error) {
       console.error('Logout error on backend:', error);
     } finally {
@@ -105,8 +106,8 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     setLoading(true);
     try {
-      const res = await apiClient.put('/users/profile', profileData);
-      const updatedUser = res.data.data.user;
+      const res = await updateUserProfile(profileData);
+      const updatedUser = res.data.user;
       
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);

@@ -19,6 +19,7 @@ import TaskList from './pages/TaskList';
 import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
 import NotFound from './pages/NotFound';
+import Unauthorized from './pages/Unauthorized';
 
 // Guard Component
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -32,6 +33,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* Protected Workspace Routing */}
           <Route

@@ -9,11 +9,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Input from '../components/common/Input';
+import Textarea from '../components/common/Textarea';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
+import FilterDropdown from '../components/common/FilterDropdown';
+import Badge from '../components/common/Badge';
 
 const TaskList = () => {
   const {
@@ -144,47 +147,51 @@ const TaskList = () => {
 
   const tableHeaders = ['Task Title', 'Status', 'Priority', 'Due Date', 'Actions'];
 
+  const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+  ];
+
+  const priorityOptions = [
+    { value: 'low', label: 'Low Priority' },
+    { value: 'medium', label: 'Medium Priority' },
+    { value: 'high', label: 'High Priority' },
+  ];
+
+  const sortOptions = [
+    { value: '-createdAt', label: 'Newest First' },
+    { value: 'createdAt', label: 'Oldest First' },
+    { value: 'dueDate', label: 'Due Date (Ascending)' },
+    { value: '-dueDate', label: 'Due Date (Descending)' },
+    { value: '-priority', label: 'Priority (High to Low)' },
+  ];
+
   const renderTaskRow = (task) => (
     <tr key={task._id} className="hover:bg-slate-50/50 transition-colors">
       <td className="p-4 pl-6">
         <div className="space-y-0.5">
           <span className="font-semibold text-slate-800 block">{task.title}</span>
           {task.description && (
-            <span className="text-xs text-slate-400 line-clamp-1 max-w-md">
+            <span className="text-xs text-slate-400 line-clamp-1 max-w-md font-medium">
               {task.description}
             </span>
           )}
         </div>
       </td>
       <td className="p-4">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-            task.status === 'completed'
-              ? 'bg-emerald-50 text-emerald-700'
-              : task.status === 'in_progress'
-              ? 'bg-blue-50 text-blue-700'
-              : 'bg-amber-50 text-amber-700'
-          }`}
-        >
+        <Badge variant={task.status}>
           {task.status.replace('_', ' ')}
-        </span>
+        </Badge>
       </td>
       <td className="p-4">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-            task.priority === 'high'
-              ? 'bg-red-50 text-red-700'
-              : task.priority === 'medium'
-              ? 'bg-indigo-50 text-indigo-700'
-              : 'bg-slate-100 text-slate-700'
-          }`}
-        >
+        <Badge variant={task.priority}>
           {task.priority}
-        </span>
+        </Badge>
       </td>
-      <td className="p-4 text-slate-500">
+      <td className="p-4 text-slate-500 font-medium">
         {task.dueDate ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-xs">
             <Calendar className="h-4 w-4 text-slate-400" />
             <span>{new Date(task.dueDate).toLocaleDateString()}</span>
           </div>
@@ -222,7 +229,7 @@ const TaskList = () => {
         </div>
         <Button
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 self-start sm:self-auto"
+          className="flex items-center gap-2 self-start sm:self-auto px-5 py-2.5 shadow-sm"
         >
           <Plus className="h-4.5 w-4.5" /> Create Task
         </Button>
@@ -232,43 +239,30 @@ const TaskList = () => {
         <SearchBar
           value={localSearch}
           onChange={setLocalSearch}
-          placeholder="Search tasks by title or description..."
+          placeholder="Search tasks..."
           className="lg:col-span-2"
         />
 
-        <select
+        <FilterDropdown
           value={statusFilter}
-          onChange={(e) => handleStatusChange(e.target.value)}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-        </select>
+          onChange={handleStatusChange}
+          options={statusOptions}
+          placeholder="All Statuses"
+        />
 
-        <select
+        <FilterDropdown
           value={priorityFilter}
-          onChange={(e) => handlePriorityChange(e.target.value)}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-        >
-          <option value="">All Priorities</option>
-          <option value="low">Low Priority</option>
-          <option value="medium">Medium Priority</option>
-          <option value="high">High Priority</option>
-        </select>
+          onChange={handlePriorityChange}
+          options={priorityOptions}
+          placeholder="All Priorities"
+        />
 
-        <select
+        <FilterDropdown
           value={sortField}
-          onChange={(e) => setSortField(e.target.value)}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-        >
-          <option value="-createdAt">Newest First</option>
-          <option value="createdAt">Oldest First</option>
-          <option value="dueDate">Due Date (Ascending)</option>
-          <option value="-dueDate">Due Date (Descending)</option>
-          <option value="-priority">Priority (High to Low)</option>
-        </select>
+          onChange={setSortField}
+          options={sortOptions}
+          placeholder="Sort By"
+        />
       </div>
 
       <div className="space-y-4">
@@ -299,17 +293,12 @@ const TaskList = () => {
             {...registerCreate('title', { required: 'Task title is required' })}
           />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Description (Optional)
-            </label>
-            <textarea
-              {...registerCreate('description')}
-              rows="3"
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-              placeholder="Describe details..."
-            />
-          </div>
+          <Textarea
+            label="Description (Optional)"
+            placeholder="Describe details..."
+            error={createErrors.description}
+            {...registerCreate('description')}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -319,7 +308,7 @@ const TaskList = () => {
               <select
                 {...registerCreate('priority')}
                 defaultValue="medium"
-                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500 bg-white"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -333,7 +322,7 @@ const TaskList = () => {
               <select
                 {...registerCreate('status')}
                 defaultValue="pending"
-                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500 bg-white"
               >
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
@@ -382,16 +371,11 @@ const TaskList = () => {
             {...registerEdit('title', { required: 'Task title is required' })}
           />
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Description
-            </label>
-            <textarea
-              {...registerEdit('description')}
-              rows="3"
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <Textarea
+            label="Description"
+            error={editErrors.description}
+            {...registerEdit('description')}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -400,7 +384,7 @@ const TaskList = () => {
               </label>
               <select
                 {...registerEdit('priority')}
-                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500 bg-white"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -413,7 +397,7 @@ const TaskList = () => {
               </label>
               <select
                 {...registerEdit('status')}
-                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-hidden focus:ring-1 focus:ring-brand-500 bg-white"
               >
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
@@ -452,3 +436,4 @@ const TaskList = () => {
 };
 
 export default TaskList;
+export { TaskList };

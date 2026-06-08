@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import apiClient from '../api/axios';
+import { getUsers, changeUserRole, deleteUser, getAuditLogs } from '../api/adminApi';
 import { useAuth } from '../context/AuthContext';
 import {
   Users,
@@ -32,8 +32,8 @@ const AdminPanel = () => {
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      const res = await apiClient.get('/users');
-      setUsers(res.data.data.users);
+      const res = await getUsers();
+      setUsers(res.data.users);
     } catch (error) {
       toast.error('Failed to retrieve user list');
     } finally {
@@ -51,8 +51,8 @@ const AdminPanel = () => {
       if (actionFilter) params.action = actionFilter;
       if (entityFilter) params.entity = entityFilter;
 
-      const res = await apiClient.get('/audit', { params });
-      const { items, total, totalPages } = res.data.data;
+      const res = await getAuditLogs(params);
+      const { items, total, totalPages } = res.data;
       setLogs(items);
       setLogTotalItems(total);
       setLogTotalPages(totalPages);
@@ -76,7 +76,7 @@ const AdminPanel = () => {
     if (!window.confirm(`Are you sure you want to change this user's role to ${nextRole}?`)) return;
 
     try {
-      await apiClient.patch(`/users/${targetUserId}/role`, { role: nextRole });
+      await changeUserRole(targetUserId, nextRole);
       toast.success(`User role changed to ${nextRole}`);
       fetchUsers();
     } catch (error) {
@@ -89,7 +89,7 @@ const AdminPanel = () => {
     if (!window.confirm('Are you sure you want to permanently delete this user? This cannot be undone.')) return;
 
     try {
-      await apiClient.delete(`/users/${targetUserId}`);
+      await deleteUser(targetUserId);
       toast.success('User account deleted');
       fetchUsers();
     } catch (error) {

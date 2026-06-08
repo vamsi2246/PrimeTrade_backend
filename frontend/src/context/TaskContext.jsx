@@ -1,5 +1,11 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import apiClient from '../api/axios';
+import {
+  getTasks,
+  getTaskStats,
+  createTask as createTaskApi,
+  updateTask as updateTaskApi,
+  deleteTask as deleteTaskApi,
+} from '../api/taskApi';
 import { useAuth } from './AuthContext';
 
 const TaskContext = createContext(null);
@@ -23,8 +29,8 @@ export const TaskProvider = ({ children }) => {
   const fetchStats = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await apiClient.get('/tasks/stats');
-      setStats(res.data.data.stats);
+      const res = await getTaskStats();
+      setStats(res.data.stats);
     } catch (error) {
       console.error('Error fetching task statistics:', error);
     }
@@ -44,8 +50,8 @@ export const TaskProvider = ({ children }) => {
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
 
-      const res = await apiClient.get('/tasks', { params });
-      const { items, total, totalPages: pages } = res.data.data;
+      const res = await getTasks(params);
+      const { items, total, totalPages: pages } = res.data;
       
       setTasks(items);
       setTotalItems(total);
@@ -65,8 +71,8 @@ export const TaskProvider = ({ children }) => {
 
   const createTask = async (taskData) => {
     try {
-      const res = await apiClient.post('/tasks', taskData);
-      const newTask = res.data.data.task;
+      const res = await createTaskApi(taskData);
+      const newTask = res.data.task;
       
       // Refresh list & statistics
       fetchTasks();
@@ -80,8 +86,8 @@ export const TaskProvider = ({ children }) => {
 
   const updateTask = async (taskId, updatedFields) => {
     try {
-      const res = await apiClient.put(`/tasks/${taskId}`, updatedFields);
-      const updatedTask = res.data.data.task;
+      const res = await updateTaskApi(taskId, updatedFields);
+      const updatedTask = res.data.task;
       
       // Update local state directly to prevent heavy re-renders, but trigger stats refresh
       setTasks((prev) => prev.map((t) => (t._id === taskId ? updatedTask : t)));
@@ -95,7 +101,7 @@ export const TaskProvider = ({ children }) => {
 
   const deleteTask = async (taskId) => {
     try {
-      await apiClient.delete(`/tasks/${taskId}`);
+      await deleteTaskApi(taskId);
       
       // Update local state
       setTasks((prev) => prev.filter((t) => t._id !== taskId));
