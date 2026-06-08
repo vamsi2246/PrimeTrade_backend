@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
 const UserRepository = require('../repositories/UserRepository');
 const { AuthenticationError, ApiError } = require('../utils/errors');
 const AuditLogService = require('./AuditLogService');
@@ -76,6 +78,74 @@ class AuthService {
       entityId: userAccount._id,
       ipAddress,
     });
+
+    const sessionUser = {
+      id: userAccount._id,
+      name: userAccount.name,
+      email: userAccount.email,
+      role: userAccount.role,
+      isActive: userAccount.isActive,
+      lastLogin: userAccount.lastLogin,
+    };
+
+    const accessToken = this.generateAccessToken(userAccount);
+    const refreshToken = this.generateRefreshToken(userAccount);
+
+    return { user: sessionUser, accessToken, refreshToken };
+  }
+
+  async googleLogin(idToken, ipAddress) {
+    if (!idToken) {
+      throw new ApiError('Google ID token is required', 400);
+    }
+
+    let payload;
+    try {
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      const oauthClient = new OAuth2Client(googleClientId);
+      const ticket = await oauthClient.verifyIdToken({
+        idToken,
+        audience: googleClientId,
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      throw new AuthenticationError('Google signature verification failed');
+    }
+
+    const { email, name } = payload;
+    let userAccount = await UserRepository.findByEmail(email);
+
+    if (!userAccount) {
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      userAccount = await UserRepository.create({
+        name,
+        email,
+        password: randomPassword,
+      });
+
+      await AuditLogService.logAction({
+        userId: userAccount._id,
+        action: 'USER_REGISTER_GOOGLE',
+        entity: 'User',
+        entityId: userAccount._id,
+        ipAddress,
+      });
+    } else {
+      if (!userAccount.isActive) {
+        throw new AuthenticationError('Account is disabled');
+      }
+
+      await AuditLogService.logAction({
+        userId: userAccount._id,
+        action: 'USER_LOGIN_GOOGLE',
+        entity: 'User',
+        entityId: userAccount._id,
+        ipAddress,
+      });
+    }
+
+    userAccount.lastLogin = new Date();
+    await userAccount.save();
 
     const sessionUser = {
       id: userAccount._id,

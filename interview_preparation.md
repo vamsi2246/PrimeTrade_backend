@@ -1,147 +1,80 @@
-# SecureTask Pro - Comprehensive Interview Preparation Guide
+# SecureTask Pro - Refactored Interview Preparation Guide
 
-This guide is structured to help you prepare for technical assessments and interviews based on the SecureTask Pro codebase.
-
----
-
-## 1. Architecture Explanation
-SecureTask Pro is engineered using a **decoupled layered architecture** utilizing the **Repository-Service Pattern**:
-- **Routing & Interceptors**: Express routers parse route parameters and hand them to controllers.
-- **Controllers**: Act as thin HTTP adapters. They read request payloads, invoke business services, and output structured JSON responses using the `successResponse` helper.
-- **Services**: Contain all business calculations, transactional logic, and user access validation.
-- **Repositories**: Abstract database querying operations. Services only interface with repositories, completely hiding Mongoose query logic. This separation allows changing database drivers without modifying service or controller layers.
+This guide breaks down the technical details, architecture decisions, and interview concepts for SecureTask Pro.
 
 ---
 
-## 2. Folder Structure Explanation
-- `/config`: Central configuration setups (MongoDB connection pool, Winston logging levels, Redis statuses).
-- `/constants`: Global domain constraints (Roles, Task status, priority) to prevent string typos.
-- `/models`: Mongoose database schemas defining document structures.
-- `/repositories`: Concrete database operation implementations.
-- `/services`: Core business transactional algorithms.
-- `/controllers`: HTTP mapping layer interfacing with Express.
-- `/middlewares`: Pipeline request interceptors (guards, validations, rate limiting).
-- `/validators`: validation schemas using express-validator.
-- `/utils`: Common helper utilities (error objects, standard JSON wrappers).
-- `/docs`: OpenAPI Swagger documentation specs.
+## 1. Architectural Structure
+SecureTask Pro uses a decoupled **monolithic architecture** structured around a classic 3-layer pattern:
+1. **Routes & Middleware**: Intercepts HTTP calls, secures headers, validates parameters, and parses access tokens.
+2. **Controllers**: Act as HTTP adapters. They extract payloads, forward data to services, and format standardized JSON outputs.
+3. **Services**: Manage core business rules, transactional updates, permissions, and audit logs.
+4. **Models (Mongoose)**: Directly handle database queries. Removing repository layers cuts down boilerplate code, making the codebase highly readable.
 
 ---
 
-## 3. JWT Authentication Flow
-We implement a **State-Free Access Token & Cookie-Based Rotation Refresh Token** pattern:
-- **Authentication**: On registering or logging in, the server generates a short-lived Access Token (15m) returned in the JSON payload, and a long-lived Refresh Token (7d) saved in a secure HTTP-Only SameSite cookie.
-- **API Access**: The client adds the Access Token in the request headers: `Authorization: Bearer <token>`.
-- **Automatic Session Refresh**: If a call fails with `401 Unauthorized`, the Axios interceptor queues subsequent requests and calls `/auth/refresh`. The server reads the secure cookie, verifies its signature, generates a new access token, rotates the refresh token cookie, and the client retries the queued requests.
-- **Logout**: Clears the cookie on the client side and logs the logout event.
-
----
-
-## 4. Request Lifecycle
-Here is the step-by-step path of a request:
-
-```
-Client Request (e.g., PUT /api/v1/tasks/:id)
-  │
-  ├──► Helmet (HTTP header protection)
-  ├──► CORS (Origin checking)
-  ├──► Morgan (Logs HTTP request parameters)
-  ├──► Rate Limiter (IP frequency check)
-  │
-  ├──► Auth Middleware (Decodes JWT, confirms user exists)
-  ├──► Role Middleware (RBAC validation)
-  ├──► Validator Middleware (Express-Validator checks fields)
-  │
-  ├──► Controller (Parses params, triggers Service)
-  ├──► Service (Checks permissions, executes business rules)
-  ├──► Repository (Issues query to Mongoose)
-  ├──► Database (Executes transaction)
-  │
-  └──► Response (Formulated via successResponse/errorResponse)
-```
-
----
-
-## 5. Middleware Flow
-Our middleware pipeline is structured to execute sequentially:
-1. **Security Guards**: Helmet, CORS, and Rate Limiter reject malicious queries early.
-2. **Logging Interceptors**: Morgan formats and pipes request traffic logs into Winston.
-3. **Session Authenticator**: Auth middleware decodes the JWT and populates `req.user`.
-4. **Access Checkers**: Role middleware restricts route access by role.
-5. **Input Validator**: Combines express-validator rules, returning a `ValidationError` early if fields are malformed.
-6. **Exception Handlers**: The global error handler converts thrown exceptions into standardized JSON outputs.
-
----
-
-## 6. Database Design Explanation
-The database schema consists of three collections:
+## 2. Database Design
+The schema is modeled in MongoDB using three collections:
 - **User**: Stores profile credentials. Implements a unique index on `email` and automatic password hashing via pre-save hooks.
-- **Task**: Includes fields for status, priority, and timestamps. Implements compound indexes on `{ createdBy: 1, isDeleted: 1, createdAt: -1 }` to optimize task listings, and soft-deletes tasks using `isDeleted: true`.
-- **AuditLog**: Stores chronological logs of system operations.
+- **Task**: Includes a soft-deletion flag `isDeleted: true` to preserve historic records. Has compound indexes on `{ createdBy: 1, isDeleted: 1, createdAt: -1 }` for optimized user query sorting.
+- **AuditLog**: Retains system operation audit trails.
 
 ---
 
-## 7. Why the Service Layer Was Used
-The Service Layer decouples business rules from the transport layer (HTTP/Express) and the persistence layer (Database). If we want to support a CLI or WebSockets in the future, we can invoke the exact same Service methods, ensuring reuse and preventing duplicate logic.
+## 3. JWT Flow & Token Rotation
+- **Access Token (Short-Lived, 15m)**: Generated on login and sent in HTTP headers (`Authorization: Bearer <token>`).
+- **Refresh Token (Long-Lived, 7d)**: Encrypted and stored in an **HTTP-Only, SameSite, Secure Cookie**.
+- **Rotation**: On expiry of the access token, the client posts to `/auth/refresh`. The server decodes the cookie, validates the payload, and responds with a fresh access token and cookie-rotated refresh token.
 
 ---
 
-## 8. Why MongoDB Was Chosen
-MongoDB is a document store that allows dynamic, flexible JSON documents. This is perfect for task models, which often expand to include properties like subtask checklists, dynamic comments, or file attachments, avoiding blocking table migrations.
+## 4. Google OAuth2 Integration Flow
+SecureTask Pro integrates **Google Identity Services (GSI)** for single sign-on:
+1. **Frontend Consent**: The client loads the Google JS SDK. When a user logs in via Google, the SDK prompts the user and returns a signed **Google ID Token** (JWT) to our callback.
+2. **Token Post**: The React app forwards this token to the backend endpoint: `POST /api/v1/auth/google`.
+3. **Verification**: The Express backend uses `google-auth-library` to parse and verify Google's signature using public keys.
+4. **User Sync**: The backend extracts `email` and `name` from Google's payload. If the user exists, we log them in. If they don't, we register them with a random password.
+5. **App Session**: The server issues a local App Access Token and configures the Refresh cookie.
 
 ---
 
-## 9. Why JWT Was Chosen
-JSON Web Tokens enable stateless authentication. Since the server decodes the signature key locally, it does not need to query a session database on every request, reducing server-side lookups.
+## 5. Middleware Pipeline
+Requests flow through the following stack:
+1. **Helmet**: Secures response HTTP headers.
+2. **CORS**: Sets allowed origins.
+3. **Morgan**: Stream logs requests through Winston.
+4. **Rate Limiter**: Blocks IP brute force attempts.
+5. **Auth Guard**: decodes access token and populates `req.user`.
+6. **Role Guard**: Restricts admin routes.
+7. **Validator**: Validates inputs using express-validator, passing validation errors to the error handler.
+8. **Global Error Handler**: Formats exceptions into JSON responses.
 
 ---
 
-## 10. Security Practices
-- **Password Hashing**: Bcrypt with 10 salt rounds.
-- **NoSQL Injection Guard**: Mongoose schema casting rejects invalid inputs early.
-- **XSS Protection**: Secure, HTTP-Only cookies prevent Javascript scripts from accessing refresh tokens.
-- **CSRF Protection**: Cookie `sameSite` configuration restricts cookie delivery to verified origins.
-- **Rate Limiting**: Limits IP request frequency to prevent brute force attacks.
+## 6. Custom Error Classes
+We created a clear hierarchy of HTTP errors:
+- **`ApiError`**: Base error class carrying HTTP status codes.
+- **`ValidationError`**: Triggered by express-validator failures (status `400`).
+- **`AuthenticationError`**: Triggered by invalid credentials or expired sessions (status `401`).
+- **`NotFoundError`**: Triggered when resources do not exist (status `404`).
 
 ---
 
-## 11. Scalability Improvements
-For heavy application traffic:
-1. **Database Read Replicas**: Direct query reads to replica sets and writes to primary nodes.
-2. **Redis Caching**: Cache common task read queries in Redis.
-3. **Microservices Migration**: Decouple Auth, Task, and AuditLog into separate services communicating over a message broker (e.g. RabbitMQ).
+## 7. Real-World Scaling Tactics
+- **Redis Cache**: Speed up reads of frequently accessed tasks.
+- **Microservices**: Decompose the monolith into separate services (e.g., Auth Service, Task Service, Audit Service) communicating over event brokers (RabbitMQ/Kafka) or gRPC.
+- **Load Balancers (NGINX)**: Distribute incoming API traffic across clusters.
+- **Kubernetes (K8s)**: Automatically scale backend containers under high load.
 
 ---
 
-## 12. Common HR and Technical Questions
+## 8. Common Technical Interview Q&As
 
-### Q: "Tell me about a challenging bug you fixed in this project."
-**A**: When implementing the token refresh flow, parallel API requests from a page load would trigger multiple concurrent refresh requests, causing token invalidation. I resolved this by adding a request queue (`failedQueue`) in the Axios interceptor. When a refresh begins, subsequent requests are queued and resolved once the new token is acquired.
+### Q: "How do you verify Google OAuth tokens securely on your Node.js backend?"
+**A**: We never trust tokens sent from the client blindly. We use Google's official `google-auth-library` and call `verifyIdToken()` passing the client token and the server's `GOOGLE_CLIENT_ID` as the audience. This validates the signature using Google's public certificates, checks token expiry, and ensures the token was indeed minted for our app.
 
-### Q: "What is your approach to handling database query optimizations?"
-**A**: I identify high-frequency queries and create targeted indexes. For example, since tasks are queried by user and sorted by date, I created a compound index on `{ createdBy: 1, isDeleted: 1, createdAt: -1 }` to enable index-only scans.
+### Q: "Why did you choose not to use the Repository Pattern?"
+**A**: While the Repository Pattern is useful for abstracting database drivers, introducing it in small-to-medium Node.js Express monoliths adds redundant code. Mongoose already functions as a data mapper and abstraction layer. Direct model queries in the Service layer keep the code clean, fast to write, and simple to debug.
 
----
-
-## 13. Backend Interview Questions Based on this Project
-
-### Q: "How does the global error handler map Mongoose errors?"
-**A**: The [error.middleware.js](file:///Users/apple/Desktop/PrimeTrade_backend/backend/src/middlewares/error.middleware.js) checks error names. If it catches a `ValidationError`, it parses validation messages into a flat array. For duplicate email attempts, it parses Mongo error code `11000` into a `409 Conflict` response.
-
-### Q: "Why do we throw a ForbiddenError instead of just returning a NotFoundError?"
-**A**: Standard users should get a `ForbiddenError` (403) if they attempt to modify tasks owned by other users. This distinguishes authorization boundaries from cases where a task truly does not exist.
-
----
-
-## 14. Explanation of Important Files
-- [app.js](file:///Users/apple/Desktop/PrimeTrade_backend/backend/src/app.js): Configures Express middleware, security headers, request parsers, and mounts API routes.
-- [server.js](file:///Users/apple/Desktop/PrimeTrade_backend/backend/src/server.js): Server entry point. Establishes DB/Redis connections and handles graceful shutdowns.
-- [auth.middleware.js](file:///Users/apple/Desktop/PrimeTrade_backend/backend/src/middlewares/auth.middleware.js): Verifies JWT signatures and populates user info.
-- [errors.js](file:///Users/apple/Desktop/PrimeTrade_backend/backend/src/utils/errors.js): Defines custom error objects extending `Error` (e.g. `ValidationError`, `ForbiddenError`).
-
----
-
-## 15. Explanation of API Endpoints
-- `POST /auth/login`: Verifies user credentials, sets refresh cookie, and returns the access token.
-- `GET /tasks`: Retrieves task lists matching query parameters (`search`, `status`, `priority`, `page`, `limit`).
-- `PUT /tasks/:id`: Edits a task, confirming the requesting user owns the task.
-- `GET /audit`: Returns system activity log records (Admin only).
+### Q: "How do you prevent XSS attacks on JWT tokens?"
+**A**: By storing the refresh token in an HTTP-Only cookie. JavaScript running in the browser cannot read HTTP-Only cookies, protecting the token from script injection attacks.

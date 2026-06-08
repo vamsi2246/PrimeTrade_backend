@@ -1,10 +1,10 @@
 # SecureTask Pro
 
-SecureTask Pro is a full-stack, secure task management platform. It is engineered with a layered clean architecture pattern (Routes ➔ Controllers ➔ Services ➔ Repositories ➔ Models) built on Node.js/Express and React/Vite. The platform serves as a production-grade template demonstrating role-based access control (RBAC), database indexing, cookie-based token rotation, and system audit trails.
+SecureTask Pro is a full-stack, secure task management platform. It is engineered with a layered clean architecture pattern (Routes ➔ Controllers ➔ Services ➔ Repositories ➔ Models) built on Node.js/Express and React/Vite. The platform serves as a production-grade template demonstrating role-based access control (RBAC), database indexing, cookie-based token rotation, Google OAuth2 Single Sign-On, and system audit trails.
 
 ---
 
-## Project Motivation & Technical Choices
+## Technical Choices & Rationale
 
 This project was built to address standard workflow challenges in enterprise task tracking, where secure data isolation, RBAC security compliance, and activity auditing are core requirements.
 
@@ -13,6 +13,7 @@ This project was built to address standard workflow challenges in enterprise tas
 - **MongoDB & Mongoose**: A document database provides natural flexibility for task configurations (e.g. description fields, due dates, checklists) which frequently change during incremental product updates, without requiring database schema lock migrations.
 - **Repository-Service Pattern**: Deactions business rules from direct Mongoose model manipulation. By abstracting queries into a dedicated Repository layer, business services remain pure and easier to cover with unit tests.
 - **JWT & HTTP-Only Refresh Tokens**: Short-lived access tokens (15m) are sent via API headers. Long-lived refresh tokens (7d) are set via secure, SameSite HTTP-Only cookies to protect users against XSS and CSRF threats.
+- **Google Single Sign-On (SSO)**: Google Identity Services (GSI) script integration allows users to log in securely using Google Auth. Google ID Tokens (JWT) are verified cryptographically on the Express backend via `google-auth-library` to issue local app sessions.
 
 ---
 
@@ -70,11 +71,13 @@ JWT_REFRESH_SECRET=your_jwt_refresh_secret_key_here
 JWT_EXPIRE=15m
 CLIENT_URL=http://localhost:5173
 NODE_ENV=development
+GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
 
 ### Frontend Configuration (`frontend/.env`)
 ```env
 VITE_API_URL=http://localhost:5000/api/v1
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
 
 ---
@@ -110,6 +113,7 @@ Navigate to `http://localhost:5173`.
 
 - `POST /api/v1/auth/register` - Register new user account
 - `POST /api/v1/auth/login` - Authenticate login and set cookie
+- `POST /api/v1/auth/google` - Verify Google ID Token and authenticate
 - `POST /api/v1/auth/refresh` - Rotate tokens via cookie
 - `POST /api/v1/auth/logout` - Clear cookies
 - `GET /api/v1/tasks` - List tasks (supports search, sort, filter, pagination)
