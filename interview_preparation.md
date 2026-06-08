@@ -9,7 +9,8 @@ SecureTask Pro uses a decoupled **monolithic architecture** structured around a 
 1. **Routes & Middleware**: Intercepts HTTP calls, secures headers, validates parameters, and parses access tokens.
 2. **Controllers**: Act as HTTP adapters. They extract payloads, forward data to services, and format standardized JSON outputs.
 3. **Services**: Manage core business rules, transactional updates, permissions, and audit logs.
-4. **Models (Mongoose)**: Directly handle database queries. Removing repository layers cuts down boilerplate code, making the codebase highly readable.
+4. **Repositories**: Abstract all database access and queries from business logic. Decoupling the data layer makes the Service layer pure, modular, and highly testable using standard mocking techniques.
+5. **Models (Mongoose)**: Define schemas, structures, validation rules, and indexes for collections in MongoDB.
 
 ---
 
@@ -73,8 +74,8 @@ We created a clear hierarchy of HTTP errors:
 ### Q: "How do you verify Google OAuth tokens securely on your Node.js backend?"
 **A**: We never trust tokens sent from the client blindly. We use Google's official `google-auth-library` and call `verifyIdToken()` passing the client token and the server's `GOOGLE_CLIENT_ID` as the audience. This validates the signature using Google's public certificates, checks token expiry, and ensures the token was indeed minted for our app.
 
-### Q: "Why did you choose not to use the Repository Pattern?"
-**A**: While the Repository Pattern is useful for abstracting database drivers, introducing it in small-to-medium Node.js Express monoliths adds redundant code. Mongoose already functions as a data mapper and abstraction layer. Direct model queries in the Service layer keep the code clean, fast to write, and simple to debug.
+### Q: "Why did you use the Repository Pattern?"
+**A**: The Repository Pattern decouples our business logic (Service layer) from the data persistence details (Mongoose/MongoDB). By abstracting query logic into `UserRepository`, `TaskRepository`, and `AuditLogRepository`, the services remain database-agnostic and clean. This separation of concerns simplifies maintenance and allows us to easily mock data access during unit and integration testing, which runs tests extremely fast without needing a live MongoDB database.
 
 ### Q: "How do you prevent XSS attacks on JWT tokens?"
 **A**: By storing the refresh token in an HTTP-Only cookie. JavaScript running in the browser cannot read HTTP-Only cookies, protecting the token from script injection attacks.

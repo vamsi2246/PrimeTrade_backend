@@ -1,7 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { checkRedisStatus } = require('../config/redis');
-const { sendSuccess } = require('../utils/response');
+const { successResponse } = require('../utils/response');
+const protect = require('../middlewares/auth.middleware');
+const authorize = require('../middlewares/role.middleware');
+const { ROLES } = require('../constants');
 
 const router = express.Router();
 
@@ -28,7 +31,7 @@ router.get('/health', (req, res) => {
   });
 });
 
-router.get('/metrics', (req, res) => {
+router.get('/metrics', protect, authorize(ROLES.ADMIN), (req, res) => {
   const memoryUsage = process.memoryUsage();
   
   const metrics = {
@@ -44,7 +47,7 @@ router.get('/metrics', (req, res) => {
     platform: process.platform,
   };
 
-  return sendSuccess(res, 200, 'Metrics retrieved successfully', metrics);
+  return successResponse(res, 200, 'Metrics retrieved successfully', metrics);
 });
 
 module.exports = router;

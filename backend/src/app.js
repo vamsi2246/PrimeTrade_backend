@@ -10,12 +10,19 @@ dotenv.config();
 
 const logger = require('./config/logger');
 const { apiLimiter } = require('./middlewares/rateLimiter.middleware');
+const { mongoSanitize } = require('./middlewares/sanitize.middleware');
 const router = require('./routes');
 const setupSwagger = require('./docs/swagger');
 const errorHandler = require('./middlewares/error.middleware');
 const { NotFoundError } = require('./utils/errors');
 
 const app = express();
+
+// Trust proxy for secure cookie and client IP resolution
+app.set('trust proxy', 1);
+
+// Explicitly disable X-Powered-By header to prevent fingerprinting
+app.disable('x-powered-by');
 
 // Set secure HTTP headers
 app.use(helmet());
@@ -37,6 +44,9 @@ app.use(cookieParser());
 // Parse incoming request JSON bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Sanitize request data to prevent MongoDB Operator Injection
+app.use(mongoSanitize);
 
 // Custom morgan logging stream to write through Winston
 const morganStream = {

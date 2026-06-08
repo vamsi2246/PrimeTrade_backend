@@ -1,3 +1,11 @@
+const dotenv = require('dotenv');
+// Load environment variables first
+dotenv.config();
+
+const validateEnv = require('./config/validateEnv');
+// Validate required environment configuration
+validateEnv();
+
 const app = require('./app');
 const connectDB = require('./config/db');
 const { initRedis } = require('./config/redis');

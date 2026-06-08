@@ -25,11 +25,15 @@ jobs:
           cd backend
           npm ci
 
-      - name: Check Backend Syntax & Structure
+      - name: Run Backend Lint
         run: |
           cd backend
-          node --check src/app.js
-          node --check src/server.js
+          npm run lint
+
+      - name: Run Backend Tests
+        run: |
+          cd backend
+          npm run test
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -48,6 +52,11 @@ jobs:
         run: |
           cd frontend
           npm ci
+
+      - name: Run Frontend Lint
+        run: |
+          cd frontend
+          npm run lint
 
       - name: Compile and Build Frontend
         run: |
