@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,8 @@ const Login = () => {
   const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isInitialized = useRef(false);
+  const googleCallbackRef = useRef(null);
   
   const {
     register,
@@ -36,7 +38,8 @@ const Login = () => {
     }
   };
 
-  const handleGoogleCredentialResponse = async (response) => {
+  // Keep a ref so the GSI callback always has fresh navigate/redirectPath/googleLogin
+  googleCallbackRef.current = async (response) => {
     try {
       await googleLogin(response.credential);
       toast.success('Sign in successful via Google!');
@@ -48,19 +51,35 @@ const Login = () => {
   };
 
   useEffect(() => {
-    // Initialize Google Identity Services if loaded
-    if (window.google) {
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '1048590392945-example.apps.googleusercontent.com',
-        callback: handleGoogleCredentialResponse,
-      });
+    if (isInitialized.current) return;
 
-      window.google.accounts.id.renderButton(
-        document.getElementById('google-signin-btn'),
-        { theme: 'outline', size: 'large', width: '384', text: 'signin_with' }
-      );
-    }
-  }, [googleLogin, navigate, redirectPath]);
+    const initializeGoogle = () => {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: (response) => googleCallbackRef.current(response),
+        });
+
+        const btnElement = document.getElementById('google-signin-btn');
+        if (btnElement) {
+          window.google.accounts.id.renderButton(
+            btnElement,
+            { theme: 'outline', size: 'large', width: '384', text: 'signin_with' }
+          );
+          isInitialized.current = true;
+        }
+      }
+    };
+
+    const interval = setInterval(() => {
+      if (window.google?.accounts?.id) {
+        initializeGoogle();
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
